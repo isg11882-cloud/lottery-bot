@@ -56,6 +56,8 @@
 지원 기능:
 - `python controller.py show_balance`
   - 현재 예치금 조회.
+- `python controller.py show_balance_status`
+  - 현재 예치금과 저잔액 경고 대상 여부를 함께 조회.
 - `python controller.py assign_virtual_account`
   - 충전용 가상계좌와 권장 충전금액 발급.
 - 구매 실행 시 잔액이 부족하면:

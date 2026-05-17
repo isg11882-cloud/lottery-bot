@@ -22,5 +22,8 @@ check_win720:
 show_balance:
 	python3 controller.py show_balance
 
+show_balance_status:
+	python3 controller.py show_balance_status
+
 assign_virtual_account:
 	python3 controller.py assign_virtual_account

@@ -255,6 +255,21 @@ def show_balance():
     print({'balance': auth_ctrl.get_user_balance()})
 
 
+def show_balance_status():
+    auth_ctrl, _, _ = _setup_and_login()
+    threshold, charge_amount, _ = get_charge_config()
+    balance_amount = auth_ctrl.get_user_balance_amount()
+    body = {
+        'balance': f'{balance_amount:,}원',
+        'balance_amount': balance_amount,
+        'threshold': threshold,
+        'needs_alert': balance_amount <= threshold,
+    }
+    if balance_amount <= threshold:
+        body['charge_guide'] = auth_ctrl.assign_virtual_account(charge_amount)
+    print(body)
+
+
 def assign_virtual_account():
     auth_ctrl, _, webhook_url = _setup_and_login()
     _, charge_amount, _ = get_charge_config()
@@ -279,7 +294,7 @@ def lotto_recommend():
 
 def run():
     if len(sys.argv) < 2:
-        print("Usage: python controller.py [buy|check|buy_lotto|buy_win720|check_lotto|check_win720|recommend_lotto|refresh_lotto_data|show_balance|assign_virtual_account]")
+        print("Usage: python controller.py [buy|check|buy_lotto|buy_win720|check_lotto|check_win720|recommend_lotto|refresh_lotto_data|show_balance|show_balance_status|assign_virtual_account]")
         return
 
     if sys.argv[1] == "buy":
@@ -300,6 +315,8 @@ def run():
         refresh_lotto_data()
     elif sys.argv[1] == "show_balance":
         show_balance()
+    elif sys.argv[1] == "show_balance_status":
+        show_balance_status()
     elif sys.argv[1] == "assign_virtual_account":
         assign_virtual_account()
   

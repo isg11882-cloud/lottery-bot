@@ -31,8 +31,8 @@ def validate_env() -> list[str]:
 def main() -> int:
     load_dotenv(override=False)
 
-    if len(sys.argv) < 2 or sys.argv[1] not in {"buy", "check", "buy_lotto", "buy_win720", "check_lotto", "check_win720", "show_balance", "assign_virtual_account"}:
-        print("Usage: python openclaw_runner.py [buy|check|buy_lotto|buy_win720|check_lotto|check_win720|show_balance|assign_virtual_account]")
+    if len(sys.argv) < 2 or sys.argv[1] not in {"buy", "check", "buy_lotto", "buy_win720", "check_lotto", "check_win720", "show_balance", "show_balance_status", "assign_virtual_account"}:
+        print("Usage: python openclaw_runner.py [buy|check|buy_lotto|buy_win720|check_lotto|check_win720|show_balance|show_balance_status|assign_virtual_account]")
         return 2
 
     missing = validate_env()
@@ -58,6 +58,8 @@ def main() -> int:
             controller.win720_check()
         elif action == "show_balance":
             controller.show_balance()
+        elif action == "show_balance_status":
+            controller.show_balance_status()
         elif action == "assign_virtual_account":
             controller.assign_virtual_account()
 
