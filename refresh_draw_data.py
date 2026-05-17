@@ -1,6 +1,7 @@
 # 이 파일은 네이버 검색 결과를 이용해 최신 로또 회차 데이터를 보강합니다.
 import json
 import re
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -73,6 +74,50 @@ def parse_draw_from_html(draw_no: int, html: str) -> dict:
     raise RefreshError(f"Could not parse draw {draw_no} from Naver search results")
 
 
+def _normalize_draws(draws: list[dict]) -> list[dict]:
+    deduped = {int(draw["draw_no"]): draw for draw in draws}
+    return [deduped[draw_no] for draw_no in sorted(deduped)]
+
+
+def backfill_missing_draws(start_draw_no: int | None = None, end_draw_no: int | None = None, pause_seconds: float = 0.25) -> dict:
+    payload = load_data()
+    draws = payload.get("draws", [])
+    if not draws:
+        raise RefreshError("No draws found in local data file")
+
+    latest_expected = estimate_latest_draw_no()
+    existing = {int(draw["draw_no"]) for draw in draws}
+    start_draw_no = start_draw_no or int(draws[0]["draw_no"])
+    end_draw_no = end_draw_no or latest_expected
+
+    missing_draws = [draw_no for draw_no in range(start_draw_no, end_draw_no + 1) if draw_no not in existing]
+    added = []
+    failed = []
+
+    for draw_no in missing_draws:
+        try:
+            html = fetch_naver_search_html(draw_no)
+            draw = parse_draw_from_html(draw_no, html)
+            draws.append(draw)
+            added.append(draw)
+            if pause_seconds > 0:
+                time.sleep(pause_seconds)
+        except Exception as exc:
+            failed.append({"draw_no": draw_no, "error": str(exc)})
+
+    payload["draws"] = _normalize_draws(draws)
+    save_data(payload)
+
+    return {
+        "requested_range": [start_draw_no, end_draw_no],
+        "missing_before": missing_draws,
+        "added_count": len(added),
+        "added_draws": added,
+        "failed": failed,
+        "latest_local_after": int(payload["draws"][-1]["draw_no"]),
+    }
+
+
 def update_latest_draw() -> dict:
     payload = load_data()
     draws = payload.get("draws", [])
@@ -81,27 +126,18 @@ def update_latest_draw() -> dict:
 
     latest_local = int(draws[-1]["draw_no"])
     latest_expected = estimate_latest_draw_no()
-
-    updated = []
-    skipped_missing_draws = max(0, latest_expected - latest_local - 1)
-    if latest_local < latest_expected:
-        html = fetch_naver_search_html(latest_expected)
-        draw = parse_draw_from_html(latest_expected, html)
-        draws.append(draw)
-        updated.append(draw)
-        payload["draws"] = draws
-        save_data(payload)
+    result = backfill_missing_draws(start_draw_no=latest_local + 1, end_draw_no=latest_expected)
 
     return {
         "latest_local_before": latest_local,
         "latest_expected": latest_expected,
-        "updated_count": len(updated),
-        "updated_draws": updated,
-        "skipped_missing_draws": skipped_missing_draws,
-        "latest_local_after": int(payload.get("draws", draws)[-1]["draw_no"]),
+        "updated_count": result["added_count"],
+        "updated_draws": result["added_draws"],
+        "failed": result["failed"],
+        "latest_local_after": result["latest_local_after"],
     }
 
 
 if __name__ == "__main__":
-    result = update_latest_draw()
+    result = backfill_missing_draws()
     print(json.dumps(result, ensure_ascii=False))
