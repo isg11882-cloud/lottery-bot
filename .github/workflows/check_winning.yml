@@ -1,27 +1,30 @@
-name: Check Winning
+name: Check lotto winning
+
 on:
   schedule:
-    - cron: 0 13 * * 6 # every Saturday on 10:00 PM (KST)
+    - cron: '0 13 * * 6' # every Saturday on 10:00 PM (KST)
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
-    runs-on: [ubuntu-latest]
-    name: Check Winning
-    steps:  
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v3    
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
-          cache: 'pip' # caching pip dependencies
-      - run: pip install -r requirements.txt
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: Run Scripts
-        run: make check # or use 'make check_lotto' / 'make check_win720' for granular check
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check lotto winning
+        run: make check_lotto
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
-          COUNT: ${{ secrets.COUNT }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          DISCORD_WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COUNT: '1'
