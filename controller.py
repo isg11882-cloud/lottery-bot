@@ -101,6 +101,47 @@ def resolve_lotto_purchase_mode() -> tuple[str, int, list[list[int]], dict | Non
     return lotto_mode, count, [], None
 
 
+def get_charge_config() -> tuple[int, int, bool]:
+    threshold = int(os.environ.get('LOW_BALANCE_THRESHOLD') or '3000')
+    charge_amount = int(os.environ.get('CHARGE_AMOUNT') or '10000')
+    auto_charge_guide = (os.environ.get('AUTO_CHARGE_GUIDE') or 'true').strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+    return threshold, charge_amount, auto_charge_guide
+
+
+def send_charge_guide(auth_ctrl: auth.AuthController, webhook_url: str | None, reason: str, required_amount: int, threshold: int, charge_amount: int) -> dict:
+    charge_guide = auth_ctrl.assign_virtual_account(charge_amount)
+    body = {
+        'reason': reason,
+        'required_amount': required_amount,
+        'threshold': threshold,
+        'balance': auth_ctrl.get_user_balance(),
+        'charge_guide': charge_guide,
+    }
+
+    if webhook_url:
+        notification.Notification().send_charge_guide_message(body, webhook_url)
+    else:
+        print('[Info] Webhook URL not configured. Skip charge guide notification send.')
+        print(body)
+
+    return body
+
+
+def ensure_balance(auth_ctrl: auth.AuthController, webhook_url: str | None, reason: str, required_amount: int):
+    threshold, charge_amount, auto_charge_guide = get_charge_config()
+    balance_amount = auth_ctrl.get_user_balance_amount()
+    min_required = max(required_amount, threshold)
+
+    if balance_amount < required_amount:
+        charge_info = send_charge_guide(auth_ctrl, webhook_url, reason, required_amount, threshold, charge_amount)
+        raise RuntimeError(
+            f"잔액 부족: 현재 {balance_amount:,}원 / 필요 {required_amount:,}원. 충전 안내를 발급했습니다. 계좌: [{charge_info['charge_guide']['bank_name']}] {charge_info['charge_guide']['account_number']}"
+        )
+
+    if auto_charge_guide and balance_amount <= min_required:
+        send_charge_guide(auth_ctrl, webhook_url, f'{reason} 후 잔액 부족 대비', required_amount, threshold, charge_amount)
+
+
 def buy_lotto645(authCtrl: auth.AuthController, cnt: int, mode: str, manual_numbers: list[list[int]] | None = None):
     lotto = lotto645.Lotto645()
     _mode = lotto645.Lotto645Mode[mode.upper()]
@@ -165,6 +206,7 @@ def buy():
     mode, count, manual_numbers, recommendation_info = resolve_lotto_purchase_mode()
 
     auth_ctrl, username, webhook_url = _setup_and_login()
+    ensure_balance(auth_ctrl, webhook_url, '통합 구매 실행', (1000 * count) + 5000)
 
     response = buy_lotto645(auth_ctrl, count, mode, manual_numbers)
     if recommendation_info:
@@ -182,6 +224,7 @@ def buy():
 def lotto_buy():
     mode, count, manual_numbers, recommendation_info = resolve_lotto_purchase_mode()
     auth_ctrl, _, discord_webhook_url = _setup_and_login()
+    ensure_balance(auth_ctrl, discord_webhook_url, '로또 구매 실행', 1000 * count)
     
     response = buy_lotto645(auth_ctrl, count, mode, manual_numbers)
     if recommendation_info:
@@ -190,6 +233,7 @@ def lotto_buy():
 
 def win720_buy():
     auth_ctrl, username, discord_webhook_url = _setup_and_login()
+    ensure_balance(auth_ctrl, discord_webhook_url, '연금복권 구매 실행', 5000)
 
     response = buy_win720(auth_ctrl, username)
     send_message(1, 1, response=response, webhook_url=discord_webhook_url)
@@ -205,6 +249,17 @@ def win720_check():
 
     response = check_winning_win720(auth_ctrl)
     send_message(0, 1, response=response, webhook_url=discord_webhook_url)
+
+def show_balance():
+    auth_ctrl, _, _ = _setup_and_login()
+    print({'balance': auth_ctrl.get_user_balance()})
+
+
+def assign_virtual_account():
+    auth_ctrl, _, webhook_url = _setup_and_login()
+    _, charge_amount, _ = get_charge_config()
+    send_charge_guide(auth_ctrl, webhook_url, '수동 충전 요청', 0, 0, charge_amount)
+
 
 def refresh_lotto_data():
     result = refresh_draw_data.update_latest_draw()
@@ -224,7 +279,7 @@ def lotto_recommend():
 
 def run():
     if len(sys.argv) < 2:
-        print("Usage: python controller.py [buy|check|recommend_lotto|refresh_lotto_data]")
+        print("Usage: python controller.py [buy|check|buy_lotto|buy_win720|check_lotto|check_win720|recommend_lotto|refresh_lotto_data|show_balance|assign_virtual_account]")
         return
 
     if sys.argv[1] == "buy":
@@ -243,6 +298,10 @@ def run():
         lotto_recommend()
     elif sys.argv[1] == "refresh_lotto_data":
         refresh_lotto_data()
+    elif sys.argv[1] == "show_balance":
+        show_balance()
+    elif sys.argv[1] == "assign_virtual_account":
+        assign_virtual_account()
   
 
 if __name__ == "__main__":

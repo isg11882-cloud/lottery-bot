@@ -183,56 +183,114 @@ class AuthController:
 
         return ""
             
-    def get_user_balance(self) -> str:
+    def _fetch_user_mndp(self) -> dict:
+        try:
+            self.http_client.get("https://www.dhlottery.co.kr/mypage/home")
+        except requests.RequestException:
+            pass
+
+        timestamp = int(datetime.datetime.now().timestamp() * 1000)
+        url = f"https://www.dhlottery.co.kr/mypage/selectUserMndp.do?_={timestamp}"
+
+        headers = copy.deepcopy(self._REQ_HEADERS)
+        headers.update({
+            "Referer": "https://www.dhlottery.co.kr/mypage/home",
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/json;charset=UTF-8",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "requestMenuUri": "/mypage/home",
+            "AJAX": "true",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Dest": "empty"
+        })
+
+        res = self.http_client.get(url, headers=headers)
+        txt = res.text.strip()
+        if txt.startswith("<"):
+            raise RuntimeError("확인 불가 (로그인/설정)")
+
+        data = json.loads(txt)
+        if 'data' in data and isinstance(data['data'], dict):
+            data = data['data']
+        if 'userMndp' in data:
+            data = data['userMndp']
+        return data
+
+    def get_user_balance_amount(self) -> int:
         last_error = None
-        
-        for attempt in range(3):
+
+        for _ in range(3):
             try:
-                 try:
-                     self.http_client.get("https://www.dhlottery.co.kr/mypage/home")
-                 except requests.RequestException:
-                     pass
-
-                 timestamp = int(datetime.datetime.now().timestamp() * 1000)
-                 url = f"https://www.dhlottery.co.kr/mypage/selectUserMndp.do?_={timestamp}"
-                 
-                 headers = copy.deepcopy(self._REQ_HEADERS)
-                 headers.update({
-                    "Referer": "https://www.dhlottery.co.kr/mypage/home",
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Content-Type": "application/json;charset=UTF-8",
-                    "Accept": "application/json, text/javascript, */*; q=0.01",
-                    "requestMenuUri": "/mypage/home",
-                    "AJAX": "true",
-                    "Sec-Fetch-Mode": "cors",
-                    "Sec-Fetch-Site": "same-origin",
-                    "Sec-Fetch-Dest": "empty"
-                 })
-                 
-                 res = self.http_client.get(url, headers=headers)
-                 
-                 txt = res.text.strip()
-                 if txt.startswith("<"):
-                      return "확인 불가 (로그인/설정)"
-
-                 data = json.loads(txt)
-                 
-                 if 'data' in data and isinstance(data['data'], dict):
-                     data = data['data']
-
-                 if 'userMndp' in data:
-                     data = data['userMndp']
-                     
-                 if 'totalAmt' in data:
-                     val = str(data['totalAmt']).replace(',', '')
-                     return f"{int(val):,}원"
-                 
-                 return "0원"
-
+                data = self._fetch_user_mndp()
+                if 'crntEntrsAmt' in data:
+                    return int(str(data['crntEntrsAmt']).replace(',', ''))
+                if 'totalAmt' in data:
+                    return int(str(data['totalAmt']).replace(',', ''))
+                return 0
             except Exception as e:
-                 last_error = e
-                 time.sleep(1)
-        
-        # If all retries failed
+                last_error = e
+                time.sleep(1)
+
         print(f"[Error] 잔액 조회에 실패했습니다: {last_error}")
-        return f"정보 로드 실패 (로그 확인)"
+        raise RuntimeError("정보 로드 실패 (로그 확인)")
+
+    def get_user_balance(self) -> str:
+        try:
+            return f"{self.get_user_balance_amount():,}원"
+        except Exception:
+            return "정보 로드 실패 (로그 확인)"
+
+    def assign_virtual_account(self, amount: int) -> dict:
+        if amount <= 0:
+            raise ValueError("amount must be positive")
+
+        def _get_tomorrow() -> str:
+            tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
+            return tomorrow.strftime("%Y%m%d")
+
+        params = {
+            "VbankExpDate": _get_tomorrow(),
+            "PayMethod": "VBANK",
+            "VbankBankCode": "089",
+            "Price": str(amount),
+        }
+
+        resp = self.http_client.get("https://www.dhlottery.co.kr/mypage/kbankInit.do", params=params)
+        req = resp.json().get("data", {}).get("reqVO", {})
+        if not req:
+            raise RuntimeError("가상계좌 초기화 정보 조회 실패")
+
+        resp2 = self.http_client.get(
+            "https://www.dhlottery.co.kr/mypage/kbankProcess.do",
+            params={
+                "PayMethod": req.get("payMethod", "VBANK"),
+                "GoodsName": req.get("goodsName"),
+                "Moid": req.get("moid"),
+                "UserIP": req.get("userIP"),
+                "MallUserID": req.get("mallUserID"),
+                "VbankExpDate": req.get("vbankExpDate"),
+                "Amt": req.get("amt"),
+                "VbankBankCode": req.get("vbankBankCode"),
+                "VbankNum": req.get("fxVrAccountNo"),
+                "FxVrAccountNo": req.get("fxVrAccountNo"),
+                "VBankAccountName": req.get("buyerName"),
+            },
+        )
+        res = resp2.json().get("data", {}).get("resVO", {})
+        if res.get("resultCode") == "FAIL":
+            raise RuntimeError("가상계좌 발급이 거절되었습니다")
+
+        vbank_num = res.get("vbankNum", "")
+        if not vbank_num:
+            raise RuntimeError("가상계좌 번호를 받지 못했습니다")
+
+        formatted = f"{vbank_num[:3]}-{vbank_num[3:7]}-{vbank_num[7:10]}-{vbank_num[10:]}"
+        return {
+            "bank_name": res.get("vbankBankName", "케이뱅크"),
+            "account_number": formatted,
+            "account_number_raw": vbank_num,
+            "amount": int(req.get("amt") or amount),
+            "expires_on": req.get("vbankExpDate") or params["VbankExpDate"],
+            "account_holder": req.get("buyerName") or "동행복권",
+        }

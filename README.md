@@ -21,6 +21,7 @@
    - `USERNAME`: 동행복권 아이디
    - `PASSWORD`: 동행복권 비밀번호
 3. 동행복권 계정 예치금을 미리 충전합니다.
+   - 이제는 잔액 부족 시 가상계좌 충전 안내를 자동으로 발급할 수 있습니다.
 4. `.github/workflows/lotto_action_purchase.yml` 워크플로우를 활성화합니다.
 5. 필요하면 `workflow_dispatch` 로 수동 실행해서 먼저 테스트합니다.
 
@@ -44,6 +45,23 @@
 
 추천 번호만 확인하려면:
 - `python controller.py recommend_lotto`
+
+## 예치금/충전 보조 기능
+
+환경 변수 예시:
+- `LOW_BALANCE_THRESHOLD=3000`
+- `CHARGE_AMOUNT=10000`
+- `AUTO_CHARGE_GUIDE=true`
+
+지원 기능:
+- `python controller.py show_balance`
+  - 현재 예치금 조회.
+- `python controller.py assign_virtual_account`
+  - 충전용 가상계좌와 권장 충전금액 발급.
+- 구매 실행 시 잔액이 부족하면:
+  - 자동으로 가상계좌 충전 안내를 생성.
+  - webhook이 있으면 충전 안내 메시지를 전송.
+  - 즉시 구매에 필요한 금액보다 적으면 구매를 중단하고 충전 안내를 먼저 띄움.
 
 ## 방법 3. 기존 Python 스크립트 방식 유지
 

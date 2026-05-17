@@ -18,3 +18,9 @@ check_lotto:
 
 check_win720:
 	python3 controller.py check_win720
+
+show_balance:
+	python3 controller.py show_balance
+
+assign_virtual_account:
+	python3 controller.py assign_virtual_account

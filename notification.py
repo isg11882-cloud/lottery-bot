@@ -2,6 +2,31 @@ import requests
 import re
 
 class Notification:
+    def send_charge_guide_message(self, body: dict, webhook_url: str) -> None:
+        charge = body.get("charge_guide") or {}
+        balance = body.get("balance", "확인불가")
+        threshold = body.get("threshold")
+        required_amount = body.get("required_amount")
+        reason = body.get("reason") or "잔액 점검"
+
+        lines = [f"충전 안내 · {reason}", f"현재 잔액: {balance}"]
+        if threshold is not None:
+            lines.append(f"알림 기준 잔액: {int(threshold):,}원")
+        if required_amount is not None:
+            lines.append(f"필요 금액: {int(required_amount):,}원")
+
+        if charge:
+            lines.extend([
+                f"권장 충전금액: {int(charge.get('amount', 0)):,}원",
+                f"가상계좌: [{charge.get('bank_name', '은행확인필요')}] {charge.get('account_number', '계좌확인필요')}",
+                f"입금기한: {charge.get('expires_on', '확인필요')}",
+            ])
+        else:
+            lines.append("가상계좌 발급 정보 없음")
+
+        message = "\n".join(lines)
+        self._send_discord_webhook(webhook_url, message)
+
     def send_lotto_buying_message(self, body: dict, webhook_url: str) -> None:
         assert type(webhook_url) == str
 
