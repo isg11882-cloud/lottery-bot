@@ -93,7 +93,12 @@ def resolve_lotto_purchase_mode() -> tuple[str, int, list[list[int]]]:
 def buy_lotto645(authCtrl: auth.AuthController, cnt: int, mode: str, manual_numbers: list[list[int]] | None = None):
     lotto = lotto645.Lotto645()
     _mode = lotto645.Lotto645Mode[mode.upper()]
-    response = lotto.buy_lotto645(authCtrl, cnt, _mode, manual_numbers)
+
+    if manual_numbers:
+        response = lotto.buy_lotto645(authCtrl, cnt, _mode, manual_numbers)
+    else:
+        response = lotto.buy_lotto645(authCtrl, cnt, _mode)
+
     response['balance'] = authCtrl.get_user_balance()
     return response
 
