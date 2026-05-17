@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Refresh latest draw data
+        run: python controller.py refresh_lotto_data
+
       - name: Purchase 1 recommended lotto game
         run: make buy_lotto
         env:

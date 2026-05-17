@@ -1,6 +1,6 @@
 {
-  "updated_at": "2025-12-30T08:00:30.531019",
-  "total_draws": 1204,
+  "updated_at": "2026-05-17T15:55:24.931475",
+  "total_draws": 1205,
   "draws": [
     {
       "draw_no": 1,
@@ -19265,6 +19265,23 @@
       "total_sell_amount": 123758619000,
       "first_prize_amount": 1661007688,
       "first_prize_winners": 18
+    },
+    {
+      "draw_no": 1224,
+      "draw_date": "2026-05-16",
+      "numbers": [
+        9,
+        18,
+        21,
+        27,
+        44,
+        45
+      ],
+      "bonus": 28,
+      "total_sell_amount": null,
+      "first_prize_amount": null,
+      "first_prize_winners": null,
+      "source": "naver-search"
     }
   ],
   "lottery_id": "korea_645",

@@ -8,11 +8,12 @@ import lotto645
 import win720
 import notification
 import recommendation
+import refresh_draw_data
 import time
 
 
 def _setup_and_login():
-    load_dotenv(override=True)
+    load_dotenv(override=False)
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
     slack_webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
@@ -75,7 +76,7 @@ def parse_manual_lotto_numbers(raw: str | None) -> list[list[int]]:
 
 
 def resolve_lotto_purchase_mode() -> tuple[str, int, list[list[int]], dict | None]:
-    load_dotenv(override=True)
+    load_dotenv(override=False)
     lotto_mode = (os.environ.get('LOTTO_MODE') or 'AUTO').strip().upper()
     manual_numbers = parse_manual_lotto_numbers(os.environ.get('LOTTO_NUMBERS'))
     recommendation_strategy = (os.environ.get('LOTTO_STRATEGY') or 'balanced_mix').strip().lower()
@@ -90,6 +91,10 @@ def resolve_lotto_purchase_mode() -> tuple[str, int, list[list[int]], dict | Non
         return 'MANUAL', len(manual_numbers), manual_numbers, None
 
     if lotto_mode in {'RECOMMENDED', 'SMART', 'AI'}:
+        try:
+            refresh_draw_data.update_latest_draw()
+        except Exception as exc:
+            print(f"[Warning] draw refresh skipped: {exc}")
         rec = recommendation.recommend_lotto_numbers(count=count, strategy=recommendation_strategy)
         return 'MANUAL', len(rec['numbers']), rec['numbers'], rec
 
@@ -201,16 +206,25 @@ def win720_check():
     response = check_winning_win720(auth_ctrl)
     send_message(0, 1, response=response, webhook_url=discord_webhook_url)
 
+def refresh_lotto_data():
+    result = refresh_draw_data.update_latest_draw()
+    print(result)
+
+
 def lotto_recommend():
     count = int(os.environ.get('COUNT') or '1')
     strategy = (os.environ.get('LOTTO_STRATEGY') or 'balanced_mix').strip().lower()
+    try:
+        refresh_draw_data.update_latest_draw()
+    except Exception as exc:
+        print(f"[Warning] draw refresh skipped: {exc}")
     recommendation_info = recommendation.recommend_lotto_numbers(count=count, strategy=strategy)
     print(recommendation_info)
 
 
 def run():
     if len(sys.argv) < 2:
-        print("Usage: python controller.py [buy|check|recommend_lotto]")
+        print("Usage: python controller.py [buy|check|recommend_lotto|refresh_lotto_data]")
         return
 
     if sys.argv[1] == "buy":
@@ -227,6 +241,8 @@ def run():
         win720_check()
     elif sys.argv[1] == "recommend_lotto":
         lotto_recommend()
+    elif sys.argv[1] == "refresh_lotto_data":
+        refresh_lotto_data()
   
 
 if __name__ == "__main__":
