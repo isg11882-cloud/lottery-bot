@@ -1,4 +1,4 @@
-name: Lotto purchase via marketplace action
+name: Lotto purchase 1 game
 
 on:
   schedule:
@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   purchase:
@@ -16,10 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Purchase 1 lotto game
-        uses: rich-automation/lotto-action@latest
+      - uses: actions/setup-python@v5
         with:
-          id: ${{ secrets.ID }}
-          pwd: ${{ secrets.PASSWORD }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          amount: 1
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Purchase 1 lotto game
+        run: make buy_lotto
+        env:
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          COUNT: '1'

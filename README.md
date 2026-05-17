@@ -4,27 +4,28 @@
 
 ## 이번 적용사항
 
-- GitHub Marketplace의 `rich-automation/lotto-action` 기준 워크플로우를 추가했습니다.
-- 신규 워크플로우 파일: `.github/workflows/lotto_action_purchase.yml`
+- GitHub Marketplace의 `rich-automation/lotto-action` 구성을 참고해 1장 구매 워크플로우를 정리했습니다.
+- 다만 해당 Marketplace 액션 저장소는 현재 GitHub에서 비활성화되어 있어, 실제 실행은 이 저장소의 Python 구매 로직으로 우회합니다.
+- 워크플로우 파일: `.github/workflows/lotto_action_purchase.yml`
 - 기본 구매 수량은 **1장**으로 설정했습니다.
-- 실행 시 지난 회차 당첨 확인과 신규 구매 이슈 기록을 액션이 처리합니다.
 
 # 사용법 
 
 ![](./.github/images/check.png)
 
-## 방법 1. Marketplace 액션으로 1장 자동구매
+## 방법 1. 1장 자동구매 워크플로우 실행
 
 1. 레포지토리를 `fork` 또는 새로 생성합니다.
 2. `Settings > Secrets and variables > Actions` 에 아래 시크릿을 등록합니다.
-   - `ID`: 동행복권 아이디
+   - `USERNAME`: 동행복권 아이디
    - `PASSWORD`: 동행복권 비밀번호
 3. 동행복권 계정 예치금을 미리 충전합니다.
-4. `Settings > Actions > General > Workflow permissions` 에서 기본 권한이 너무 제한적이면 이슈 작성이 가능하도록 확인합니다.
-5. `.github/workflows/lotto_action_purchase.yml` 워크플로우를 활성화합니다.
-6. 필요하면 `workflow_dispatch` 로 수동 실행해서 먼저 테스트합니다.
+4. `.github/workflows/lotto_action_purchase.yml` 워크플로우를 활성화합니다.
+5. 필요하면 `workflow_dispatch` 로 수동 실행해서 먼저 테스트합니다.
 
 현재 스케줄은 **매주 월요일 19:00 KST** 기준으로 맞춰져 있습니다.
+
+> 참고: Marketplace의 `rich-automation/lotto-action` 저장소는 현재 비활성화 상태라, 실제 구매는 저장소 내 Python 자동화로 실행됩니다.
 
 ## 방법 2. 기존 Python 스크립트 방식 유지
 
@@ -33,4 +34,4 @@
 
 # Reference 
 - https://github.com/roeniss/dhlottery-api
-- https://github.com/marketplace/actions/lotto-action
+- https://github.com/marketplace/actions/lotto-action (현재 원본 저장소 비활성화 상태)
