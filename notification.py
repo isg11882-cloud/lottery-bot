@@ -12,7 +12,11 @@ class Notification:
             return
 
         lotto_number_str = self.make_lotto_number_message(result["arrGameChoiceNum"])
-        message = f"{result['buyRound']}회 로또 구매 완료 :moneybag: 남은잔액 : {body.get('balance', '확인불가')}\n```{lotto_number_str}```"
+        recommendation = body.get("recommendation")
+        recommendation_line = ""
+        if recommendation:
+            recommendation_line = f"\n추천전략: {recommendation.get('strategy', 'unknown')}"
+        message = f"{result['buyRound']}회 로또 구매 완료 :moneybag: 남은잔액 : {body.get('balance', '확인불가')}{recommendation_line}\n```{lotto_number_str}```"
         self._send_discord_webhook(webhook_url, message)
 
     def make_lotto_number_message(self, lotto_number: list) -> str:

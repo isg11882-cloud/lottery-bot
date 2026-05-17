@@ -23,9 +23,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Purchase 1 lotto game
+      - name: Purchase 1 recommended lotto game
         run: make buy_lotto
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
           COUNT: '1'
+          LOTTO_MODE: RECOMMENDED
+          LOTTO_STRATEGY: hybrid

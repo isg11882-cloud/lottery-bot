@@ -7,6 +7,7 @@ import auth
 import lotto645
 import win720
 import notification
+import recommendation
 import time
 
 
@@ -73,21 +74,26 @@ def parse_manual_lotto_numbers(raw: str | None) -> list[list[int]]:
     return games
 
 
-def resolve_lotto_purchase_mode() -> tuple[str, int, list[list[int]]]:
+def resolve_lotto_purchase_mode() -> tuple[str, int, list[list[int]], dict | None]:
     load_dotenv(override=True)
     lotto_mode = (os.environ.get('LOTTO_MODE') or 'AUTO').strip().upper()
     manual_numbers = parse_manual_lotto_numbers(os.environ.get('LOTTO_NUMBERS'))
+    recommendation_strategy = (os.environ.get('LOTTO_STRATEGY') or 'balanced_mix').strip().lower()
 
     if lotto_mode == 'MANUAL':
         if not manual_numbers:
             raise ValueError('LOTTO_MODE=MANUAL requires LOTTO_NUMBERS to be set.')
-        return lotto_mode, len(manual_numbers), manual_numbers
+        return lotto_mode, len(manual_numbers), manual_numbers, None
 
     count = int(os.environ.get('COUNT'))
     if manual_numbers:
-        return 'MANUAL', len(manual_numbers), manual_numbers
+        return 'MANUAL', len(manual_numbers), manual_numbers, None
 
-    return lotto_mode, count, []
+    if lotto_mode in {'RECOMMENDED', 'SMART', 'AI'}:
+        rec = recommendation.recommend_lotto_numbers(count=count, strategy=recommendation_strategy)
+        return 'MANUAL', len(rec['numbers']), rec['numbers'], rec
+
+    return lotto_mode, count, [], None
 
 
 def buy_lotto645(authCtrl: auth.AuthController, cnt: int, mode: str, manual_numbers: list[list[int]] | None = None):
@@ -151,11 +157,13 @@ def check():
     send_message(0, 1, response=response, webhook_url=webhook_url)
 
 def buy(): 
-    mode, count, manual_numbers = resolve_lotto_purchase_mode()
+    mode, count, manual_numbers, recommendation_info = resolve_lotto_purchase_mode()
 
     auth_ctrl, username, webhook_url = _setup_and_login()
 
-    response = buy_lotto645(auth_ctrl, count, mode, manual_numbers) 
+    response = buy_lotto645(auth_ctrl, count, mode, manual_numbers)
+    if recommendation_info:
+        response['recommendation'] = recommendation_info
     send_message(1, 0, response=response, webhook_url=webhook_url)
 
     time.sleep(10)
@@ -167,10 +175,12 @@ def buy():
     send_message(1, 1, response=response, webhook_url=webhook_url)
 
 def lotto_buy():
-    mode, count, manual_numbers = resolve_lotto_purchase_mode()
+    mode, count, manual_numbers, recommendation_info = resolve_lotto_purchase_mode()
     auth_ctrl, _, discord_webhook_url = _setup_and_login()
     
     response = buy_lotto645(auth_ctrl, count, mode, manual_numbers)
+    if recommendation_info:
+        response['recommendation'] = recommendation_info
     send_message(1, 0, response=response, webhook_url=discord_webhook_url)
 
 def win720_buy():
@@ -191,9 +201,16 @@ def win720_check():
     response = check_winning_win720(auth_ctrl)
     send_message(0, 1, response=response, webhook_url=discord_webhook_url)
 
+def lotto_recommend():
+    count = int(os.environ.get('COUNT') or '1')
+    strategy = (os.environ.get('LOTTO_STRATEGY') or 'balanced_mix').strip().lower()
+    recommendation_info = recommendation.recommend_lotto_numbers(count=count, strategy=strategy)
+    print(recommendation_info)
+
+
 def run():
     if len(sys.argv) < 2:
-        print("Usage: python controller.py [buy|check]")
+        print("Usage: python controller.py [buy|check|recommend_lotto]")
         return
 
     if sys.argv[1] == "buy":
@@ -208,6 +225,8 @@ def run():
         lotto_check()
     elif sys.argv[1] == "check_win720":
         win720_check()
+    elif sys.argv[1] == "recommend_lotto":
+        lotto_recommend()
   
 
 if __name__ == "__main__":
