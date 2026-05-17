@@ -1,0 +1,25 @@
+name: Lotto purchase via marketplace action
+
+on:
+  schedule:
+    # 매주 월요일 19:00 KST = 월요일 10:00 UTC
+    - cron: '0 10 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  purchase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Purchase 1 lotto game
+        uses: rich-automation/lotto-action@latest
+        with:
+          id: ${{ secrets.ID }}
+          pwd: ${{ secrets.PASSWORD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          amount: 1
