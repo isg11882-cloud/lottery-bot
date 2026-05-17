@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from dotenv import load_dotenv
 
@@ -35,10 +36,64 @@ def _setup_and_login():
 
     return auth_ctrl, username, webhook_url
 
-def buy_lotto645(authCtrl: auth.AuthController, cnt: int, mode: str):
+def parse_manual_lotto_numbers(raw: str | None) -> list[list[int]]:
+    if not raw:
+        return []
+
+    normalized = raw.strip()
+    if not normalized:
+        return []
+
+    chunks = [chunk.strip() for chunk in re.split(r"\s*[|;\n]+\s*", normalized) if chunk.strip()]
+    games: list[list[int]] = []
+
+    for chunk in chunks:
+        if ":" in chunk:
+            chunk = chunk.split(":", 1)[1].strip()
+
+        nums = [part.strip() for part in chunk.split(",") if part.strip()]
+        if len(nums) != 6:
+            raise ValueError(f"Each manual game must contain exactly 6 numbers: {chunk}")
+
+        try:
+            game = [int(num) for num in nums]
+        except ValueError as exc:
+            raise ValueError(f"Manual numbers must be integers only: {chunk}") from exc
+
+        if any(num < 1 or num > 45 for num in game):
+            raise ValueError(f"Manual numbers must be between 1 and 45: {chunk}")
+        if len(set(game)) != 6:
+            raise ValueError(f"Manual numbers cannot contain duplicates: {chunk}")
+
+        games.append(sorted(game))
+
+    if not 1 <= len(games) <= 5:
+        raise ValueError("LOTTO_NUMBERS must contain between 1 and 5 games.")
+
+    return games
+
+
+def resolve_lotto_purchase_mode() -> tuple[str, int, list[list[int]]]:
+    load_dotenv(override=True)
+    lotto_mode = (os.environ.get('LOTTO_MODE') or 'AUTO').strip().upper()
+    manual_numbers = parse_manual_lotto_numbers(os.environ.get('LOTTO_NUMBERS'))
+
+    if lotto_mode == 'MANUAL':
+        if not manual_numbers:
+            raise ValueError('LOTTO_MODE=MANUAL requires LOTTO_NUMBERS to be set.')
+        return lotto_mode, len(manual_numbers), manual_numbers
+
+    count = int(os.environ.get('COUNT'))
+    if manual_numbers:
+        return 'MANUAL', len(manual_numbers), manual_numbers
+
+    return lotto_mode, count, []
+
+
+def buy_lotto645(authCtrl: auth.AuthController, cnt: int, mode: str, manual_numbers: list[list[int]] | None = None):
     lotto = lotto645.Lotto645()
     _mode = lotto645.Lotto645Mode[mode.upper()]
-    response = lotto.buy_lotto645(authCtrl, cnt, _mode)
+    response = lotto.buy_lotto645(authCtrl, cnt, _mode, manual_numbers)
     response['balance'] = authCtrl.get_user_balance()
     return response
 
@@ -60,7 +115,12 @@ def check_winning_win720(authCtrl: auth.AuthController) -> dict:
     item['balance'] = authCtrl.get_user_balance()
     return item
 
-def send_message(mode: int, lottery_type: int, response: dict, webhook_url: str):
+def send_message(mode: int, lottery_type: int, response: dict, webhook_url: str | None):
+    if not webhook_url:
+        print("[Info] Webhook URL not configured. Skip notification send.")
+        print(response)
+        return
+
     notify = notification.Notification()
 
     if mode == 0:
@@ -86,13 +146,11 @@ def check():
     send_message(0, 1, response=response, webhook_url=webhook_url)
 
 def buy(): 
-    load_dotenv(override=True) 
-    count = int(os.environ.get('COUNT'))
-    mode = "AUTO"
+    mode, count, manual_numbers = resolve_lotto_purchase_mode()
 
     auth_ctrl, username, webhook_url = _setup_and_login()
 
-    response = buy_lotto645(auth_ctrl, count, mode) 
+    response = buy_lotto645(auth_ctrl, count, mode, manual_numbers) 
     send_message(1, 0, response=response, webhook_url=webhook_url)
 
     time.sleep(10)
@@ -104,12 +162,10 @@ def buy():
     send_message(1, 1, response=response, webhook_url=webhook_url)
 
 def lotto_buy():
-    load_dotenv(override=True)
-    count = int(os.environ.get('COUNT'))
+    mode, count, manual_numbers = resolve_lotto_purchase_mode()
     auth_ctrl, _, discord_webhook_url = _setup_and_login()
-    mode = "AUTO"
     
-    response = buy_lotto645(auth_ctrl, count, mode)
+    response = buy_lotto645(auth_ctrl, count, mode, manual_numbers)
     send_message(1, 0, response=response, webhook_url=discord_webhook_url)
 
 def win720_buy():
