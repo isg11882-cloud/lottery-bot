@@ -27,10 +27,31 @@ jobs:
         run: python controller.py refresh_lotto_data
 
       - name: Purchase 1 recommended lotto game
-        run: make buy_lotto
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            echo "[purchase] attempt ${attempt}/2"
+            if make buy_lotto; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "[purchase] transient failure, retrying after 20s"
+              sleep 20
+            fi
+          done
+
+          echo "[purchase] failed after 2 attempts"
+          exit 1
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
           COUNT: '1'
           LOTTO_MODE: RECOMMENDED
           LOTTO_STRATEGY: hybrid
+          LOTTO_HTTP_CONNECT_TIMEOUT: '45'
+          LOTTO_HTTP_READ_TIMEOUT: '60'
+          LOTTO_HTTP_RETRIES: '5'
+          LOTTO_HTTP_READ_RETRIES: '3'
+          LOTTO_HTTP_BACKOFF: '1.5'
